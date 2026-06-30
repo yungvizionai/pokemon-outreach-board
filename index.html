@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pokémon Party Outreach</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#0B1E3C;
+    --blue:#00C6F8;
+    --cyan:#6EEBFF;
+    --orange:#FBA12C;
+    --green:#00CC99;
+    --ink:#1c2a3a;
+    --muted:#6b7a90;
+    --line:#e4e9f0;
+    --bg:#f6f8fb;
+    --card:#ffffff;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Montserrat',system-ui,sans-serif;background:var(--bg);color:var(--ink);line-height:1.45}
+  .wrap{max-width:1120px;margin:0 auto;padding:20px 16px 40px}
+
+  header.hero{background:var(--navy);border-radius:16px;padding:26px 28px;color:#fff;position:relative;overflow:hidden}
+  header.hero::after{content:"";position:absolute;right:-40px;top:-40px;width:220px;height:220px;background:radial-gradient(circle,rgba(0,198,248,.35),transparent 70%)}
+  .hero h1{font-size:26px;font-weight:800;letter-spacing:-.3px}
+  .hero p{color:var(--cyan);font-weight:500;margin-top:4px;font-size:14px}
+
+  .stats{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin:16px 0 8px}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;text-align:center}
+  .stat .num{display:block;font-size:28px;font-weight:800;color:var(--navy);line-height:1}
+  .stat .num.grow{color:var(--green)}
+  .stat .label{display:block;font-size:11px;color:var(--muted);font-weight:600;margin-top:6px;text-transform:uppercase;letter-spacing:.4px}
+
+  .board{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:14px;margin-top:18px;align-items:start}
+  .col h2{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--ink);padding:0 4px 10px;display:flex;align-items:center;gap:8px}
+  .col h2 .dot{width:10px;height:10px;border-radius:50%;flex:none}
+  .col h2 .count{margin-left:auto;background:#eef2f7;color:var(--muted);border-radius:20px;padding:1px 9px;font-size:11px}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px 14px;margin-bottom:11px;box-shadow:0 1px 2px rgba(11,30,60,.04);border-left:3px solid var(--barcolor,#e4e9f0)}
+  .card .name{font-weight:700;font-size:14px;color:var(--navy)}
+  .card .city{font-size:12px;color:var(--muted);font-weight:500;margin-top:1px}
+  .meta{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--muted);margin-top:10px;gap:6px}
+  .date{font-weight:600;color:#54657b;white-space:nowrap}
+  .vol{font-weight:700;font-size:10px;padding:2px 8px;border-radius:20px;white-space:nowrap}
+  .vol.set{background:rgba(0,204,153,.12);color:#0a8a67}
+  .vol.recruiting{background:rgba(251,161,44,.14);color:#b9740f}
+  .vol.need{background:rgba(251,161,44,.14);color:#b9740f}
+
+  footer{margin-top:24px;font-size:11px;color:var(--muted);text-align:center;line-height:1.6}
+
+  @media(max-width:880px){
+    .stats{grid-template-columns:repeat(2,1fr)}
+    .board{grid-template-columns:1fr}
+    .col h2{margin-top:6px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <h1>Pokémon Party Outreach</h1>
+    <p>Bringing Pokémon to kids in children's hospitals nationwide</p>
+  </header>
+
+  <section class="stats" id="stats"></section>
+
+  <section class="board" id="board"></section>
+
+  <footer>
+    Live tracker for the Chantville Pokémon League hospital outreach program.<br>
+    Draft concept · data shown is current as of the working sheet.
+  </footer>
+
+</div>
+
+<script>
+// ---- DATA (hardcoded for this draft; production reads the published Google Sheet) ----
+// Columns are derived purely from the three date fields below.
+const H = [
+  {name:"Orlando Nemours Children's", city:"Orlando, FL",   shipped:"Mar 2026", reviewed:"Apr 2026", event:"",         vol:"recruiting"},
+  {name:"Seattle Children's",          city:"Seattle, WA",   shipped:"Feb 2026", reviewed:"Mar 2026", event:"Jun 2026", vol:"set"},
+  {name:"Children's Memorial Hermann", city:"Houston, TX",   shipped:"Feb 2026", reviewed:"Feb 2026", event:"",         vol:"need"},
+  {name:"UMC Children's",              city:"Las Vegas, NV", shipped:"Nov 2025", reviewed:"Nov 2025", event:"",         vol:"need"},
+  {name:"INOVA Fairfax Children's",    city:"Fairfax, VA",   shipped:"Nov 2025", reviewed:"",         event:"",         vol:""},
+  {name:"Mannings Children's",         city:"New Orleans, LA",shipped:"Jun 2025",reviewed:"Jun 2025", event:"",         vol:"need"},
+  {name:"Children's Wisconsin",        city:"Milwaukee, WI", shipped:"May 2025", reviewed:"",         event:"",         vol:""},
+  {name:"Children's Inn",              city:"Bethesda, MD",  shipped:"Feb 2025", reviewed:"",         event:"Jun 2026", vol:"set"},
+  {name:"National Children's",         city:"Washington, DC",shipped:"Dec 2024", reviewed:"May 2024", event:"Nov 2025", vol:"set"},
+  {name:"St. Jude",                    city:"Memphis, TN",   shipped:"Dec 2024", reviewed:"",         event:"",         vol:""},
+  {name:"Boys and Girls Club",         city:"Chantilly, VA", shipped:"Nov 2022", reviewed:"",         event:"Nov 2022", vol:""}
+];
+
+// ---- IMPACT STATS ----
+function renderStats(){
+  const hospitals = H.filter(h=>h.name!=="Boys and Girls Club");
+  const states = new Set(hospitals.map(h=>h.city.split(", ")[1])); // includes DC as the 10th location
+  const parties = H.filter(h=>!!h.event).length;
+  const stats = [
+    {num:hospitals.length, label:"Hospitals reached"},
+    {num:states.size, label:"States + DC"},
+    {num:hospitals.length, label:"Party boxes shipped"},
+    {num:parties, label:"Hosting parties", grow:true},
+    {num:"$14K+", label:"Raised for St. Jude", grow:true}
+  ];
+  document.getElementById("stats").innerHTML = stats.map(s=>
+    `<div class="stat"><span class="num ${s.grow?'grow':''}">${s.num}</span><span class="label">${s.label}</span></div>`
+  ).join("");
+}
+
+// ---- BOARD (column membership derived from date fields) ----
+const COLS = [
+  {title:"Donation resources shipped", color:"#FBA12C", dateField:"shipped",  dateLabel:"Last shipped", showVol:false, filter:h=>!!h.shipped},
+  {title:"Party event details shared", color:"#00C6F8", dateField:"reviewed", dateLabel:"Shared",       showVol:true,  filter:h=>!!h.reviewed && !h.event},
+  {title:"Pokémon Parties Hosted",     color:"#00CC99", dateField:"event",    dateLabel:"Last party",   showVol:true,  filter:h=>!!h.event}
+];
+
+function volTag(v){
+  if(v==="set")        return `<span class="vol set">Volunteer set</span>`;
+  if(v==="recruiting") return `<span class="vol recruiting">Recruiting</span>`;
+  if(v==="need")       return `<span class="vol need">Needs volunteer</span>`;
+  return "";
+}
+
+function renderBoard(){
+  document.getElementById("board").innerHTML = COLS.map(col=>{
+    const items = H.filter(col.filter);
+    return `<div class="col">
+      <h2><span class="dot" style="background:${col.color}"></span>${col.title}<span class="count">${items.length}</span></h2>
+      ${items.map(h=>{
+        const d = h[col.dateField];
+        return `<div class="card" style="--barcolor:${col.color}">
+          <div class="name">${h.name}</div>
+          <div class="city">${h.city}</div>
+          <div class="meta">
+            <span class="date">${col.dateLabel}: ${d||"—"}</span>
+            ${col.showVol ? volTag(h.vol) : ""}
+          </div>
+        </div>`;
+      }).join("")}
+    </div>`;
+  }).join("");
+}
+
+renderStats();
+renderBoard();
+</script>
+</body>
+</html>

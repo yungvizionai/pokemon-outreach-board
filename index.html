@@ -118,21 +118,29 @@ function deriveVolTag(raw){
 //
 // Columns are read by position, not by header name: Hospital Name, City, Status,
 // Last Donation Shipped, Reviewed/Trained, Last Event Held, Hospital Contact,
-// Professor Volunteer, Notes (per the sheet's fixed column order). Positional
-// access is required here, not a style choice - rows have a varying number of
-// trailing blank cells, and PapaParse's header:true mode silently drops a row
-// when a short row containing an embedded multi-line quoted field follows the
-// header (observed: it ate the Seattle row entirely). header:false avoids it.
+// Professor Volunteer, Notes, Boxes Shipped (per the sheet's fixed column order,
+// with Boxes Shipped appended as the last column so it can't shift the others).
+// Positional access is required here, not a style choice - rows have a varying
+// number of trailing blank cells, and PapaParse's header:true mode silently
+// drops a row when a short row containing an embedded multi-line quoted field
+// follows the header (observed: it ate the Seattle row entirely). header:false
+// avoids it.
 function rowsToHospitals(rows){
   return rows
-    .map(r => ({
-      name: (r[0] || "").trim(),
-      city: (r[1] || "").trim(),
-      shipped: formatDate(r[3]),
-      reviewed: formatDate(r[4]),
-      event: formatDate(r[5]),
-      vol: deriveVolTag(r[7])
-    }))
+    .map(r => {
+      const shipped = formatDate(r[3]);
+      const boxCount = parseInt((r[9] || "").trim(), 10);
+      return {
+        name: (r[0] || "").trim(),
+        city: (r[1] || "").trim(),
+        shipped,
+        reviewed: formatDate(r[4]),
+        event: formatDate(r[5]),
+        vol: deriveVolTag(r[7]),
+        // Defaults to 1 box if the count is missing/invalid but a shipped date exists
+        boxes: shipped ? (Number.isFinite(boxCount) && boxCount > 0 ? boxCount : 1) : 0
+      };
+    })
     .filter(h => h.name && h.name !== "N/A");
 }
 
@@ -152,7 +160,7 @@ function stateToken(city){
 function renderStats(){
   const hospitals = H.filter(h=>h.name!=="Boys and Girls Club");
   const states = new Set(hospitals.map(h=>stateToken(h.city)).filter(Boolean)); // includes DC as the 10th location
-  const shipped = H.filter(h=>!!h.shipped).length; // shipped count covers every recipient, hospital or not
+  const shipped = H.reduce((sum, h) => sum + h.boxes, 0); // total boxes shipped, covers every recipient and repeat shipments
   const parties = H.filter(h=>!!h.event).length;
   const stats = [
     {num:hospitals.length, label:"Hospitals reached"},

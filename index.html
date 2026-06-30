@@ -115,15 +115,23 @@ function deriveVolTag(raw){
 
 // Privacy rule: only Hospital Name, City, the three date columns, and the
 // derived volunteer status are read. Hospital Contact and Notes never enter H.
+//
+// Columns are read by position, not by header name: Hospital Name, City, Status,
+// Last Donation Shipped, Reviewed/Trained, Last Event Held, Hospital Contact,
+// Professor Volunteer, Notes (per the sheet's fixed column order). Positional
+// access is required here, not a style choice - rows have a varying number of
+// trailing blank cells, and PapaParse's header:true mode silently drops a row
+// when a short row containing an embedded multi-line quoted field follows the
+// header (observed: it ate the Seattle row entirely). header:false avoids it.
 function rowsToHospitals(rows){
   return rows
     .map(r => ({
-      name: (r["Hospital Name"] || "").trim(),
-      city: (r["City"] || "").trim(),
-      shipped: formatDate(r["Last Donation Shipped"]),
-      reviewed: formatDate(r["Reviewed/Trained"]),
-      event: formatDate(r["Last Event Held"]),
-      vol: deriveVolTag(r["Professor Volunteer"])
+      name: (r[0] || "").trim(),
+      city: (r[1] || "").trim(),
+      shipped: formatDate(r[3]),
+      reviewed: formatDate(r[4]),
+      event: formatDate(r[5]),
+      vol: deriveVolTag(r[7])
     }))
     .filter(h => h.name && h.name !== "N/A");
 }
@@ -198,8 +206,9 @@ fetch(CSV_URL)
     return res.text();
   })
   .then(csvText => {
-    const parsed = Papa.parse(csvText, {header:true, skipEmptyLines:true});
-    H = rowsToHospitals(parsed.data);
+    const parsed = Papa.parse(csvText, {skipEmptyLines:true});
+    const [, ...dataRows] = parsed.data; // drop the header row
+    H = rowsToHospitals(dataRows);
     renderStats();
     renderBoard();
   })

@@ -152,7 +152,7 @@ function stateToken(city){
 function renderStats(){
   const hospitals = H.filter(h=>h.name!=="Boys and Girls Club");
   const states = new Set(hospitals.map(h=>stateToken(h.city)).filter(Boolean)); // includes DC as the 10th location
-  const shipped = hospitals.filter(h=>!!h.shipped).length;
+  const shipped = H.filter(h=>!!h.shipped).length; // shipped count covers every recipient, hospital or not
   const parties = H.filter(h=>!!h.event).length;
   const stats = [
     {num:hospitals.length, label:"Hospitals reached"},

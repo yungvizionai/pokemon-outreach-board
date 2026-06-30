@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pokémon Party Outreach</title>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 <style>
   :root{
     --navy:#0B1E3C;
@@ -71,27 +72,66 @@
 
   <footer>
     Live tracker for the Chantville Pokémon League hospital outreach program.<br>
-    Draft concept · data shown is current as of the working sheet.
+    Data syncs directly from the working sheet.
   </footer>
 
 </div>
 
 <script>
-// ---- DATA (hardcoded for this draft; production reads the published Google Sheet) ----
+// ---- DATA (live fetch from the published Google Sheet) ----
 // Columns are derived purely from the three date fields below.
-const H = [
-  {name:"Orlando Nemours Children's", city:"Orlando, FL",   shipped:"Mar 2026", reviewed:"Apr 2026", event:"",         vol:"recruiting"},
-  {name:"Seattle Children's",          city:"Seattle, WA",   shipped:"Feb 2026", reviewed:"Mar 2026", event:"Jun 2026", vol:"set"},
-  {name:"Children's Memorial Hermann", city:"Houston, TX",   shipped:"Feb 2026", reviewed:"Feb 2026", event:"",         vol:"need"},
-  {name:"UMC Children's",              city:"Las Vegas, NV", shipped:"Nov 2025", reviewed:"Nov 2025", event:"",         vol:"need"},
-  {name:"INOVA Fairfax Children's",    city:"Fairfax, VA",   shipped:"Nov 2025", reviewed:"",         event:"",         vol:""},
-  {name:"Mannings Children's",         city:"New Orleans, LA",shipped:"Jun 2025",reviewed:"Jun 2025", event:"",         vol:"need"},
-  {name:"Children's Wisconsin",        city:"Milwaukee, WI", shipped:"May 2025", reviewed:"",         event:"",         vol:""},
-  {name:"Children's Inn",              city:"Bethesda, MD",  shipped:"Feb 2025", reviewed:"",         event:"Jun 2026", vol:"set"},
-  {name:"National Children's",         city:"Washington, DC",shipped:"Dec 2024", reviewed:"May 2024", event:"Nov 2025", vol:"set"},
-  {name:"St. Jude",                    city:"Memphis, TN",   shipped:"Dec 2024", reviewed:"",         event:"",         vol:""},
-  {name:"Boys and Girls Club",         city:"Chantilly, VA", shipped:"Nov 2022", reviewed:"",         event:"Nov 2022", vol:""}
-];
+const SHEET_ID = "17dc4SxaOXWxdiqosHbs5T2WBQF2xAN1FdVgHaSYlo0k";
+const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=0`;
+
+let H = [];
+
+function escapeHtml(str){
+  return String(str).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+// Sheet dates look like 6/1/2026 -> "Jun 2026"
+function formatDate(raw){
+  const v = (raw || "").trim();
+  if(!v) return "";
+  const parts = v.split("/");
+  if(parts.length !== 3) return v;
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const m = Number(parts[0]), y = Number(parts[2]);
+  if(!m || !y || m < 1 || m > 12) return v;
+  return `${months[m-1]} ${y}`;
+}
+
+// Maps the free-text Professor Volunteer column to a tag, most specific match first
+function deriveVolTag(raw){
+  const v = (raw || "").trim();
+  if(!v || v === "Not needed") return "";
+  if(v.includes("Recruitment Active")) return "recruiting";
+  if(v.includes("To be Recruited")) return "need";
+  const countMatch = v.match(/\d+/);
+  const hasProfessorCount = countMatch && Number(countMatch[0]) >= 1;
+  if(v.includes("Professor") || hasProfessorCount) return "set";
+  return "";
+}
+
+// Privacy rule: only Hospital Name, City, the three date columns, and the
+// derived volunteer status are read. Hospital Contact and Notes never enter H.
+function rowsToHospitals(rows){
+  return rows
+    .map(r => ({
+      name: (r["Hospital Name"] || "").trim(),
+      city: (r["City"] || "").trim(),
+      shipped: formatDate(r["Last Donation Shipped"]),
+      reviewed: formatDate(r["Reviewed/Trained"]),
+      event: formatDate(r["Last Event Held"]),
+      vol: deriveVolTag(r["Professor Volunteer"])
+    }))
+    .filter(h => h.name && h.name !== "N/A");
+}
+
+function renderLoadError(){
+  document.getElementById("board").innerHTML =
+    '<p style="color:var(--muted);padding:20px 4px">Unable to load live data right now. Please check back shortly.</p>';
+}
 
 // ---- IMPACT STATS ----
 function renderStats(){
@@ -132,10 +172,10 @@ function renderBoard(){
       ${items.map(h=>{
         const d = h[col.dateField];
         return `<div class="card" style="--barcolor:${col.color}">
-          <div class="name">${h.name}</div>
-          <div class="city">${h.city}</div>
+          <div class="name">${escapeHtml(h.name)}</div>
+          <div class="city">${escapeHtml(h.city)}</div>
           <div class="meta">
-            <span class="date">${col.dateLabel}: ${d||"—"}</span>
+            <span class="date">${col.dateLabel}: ${escapeHtml(d||"—")}</span>
             ${col.showVol ? volTag(h.vol) : ""}
           </div>
         </div>`;
@@ -144,8 +184,21 @@ function renderBoard(){
   }).join("");
 }
 
-renderStats();
-renderBoard();
+fetch(CSV_URL)
+  .then(res => {
+    if(!res.ok) throw new Error(`Sheet fetch failed: ${res.status}`);
+    return res.text();
+  })
+  .then(csvText => {
+    const parsed = Papa.parse(csvText, {header:true, skipEmptyLines:true});
+    H = rowsToHospitals(parsed.data);
+    renderStats();
+    renderBoard();
+  })
+  .catch(err => {
+    console.error(err);
+    renderLoadError();
+  });
 </script>
 </body>
 </html>

@@ -134,16 +134,24 @@ function renderLoadError(){
 }
 
 // ---- IMPACT STATS ----
+// City is usually "City, ST" but can appear as "City ST" with no comma (e.g. "Washington DC") -
+// match the trailing state token directly instead of relying on a comma split.
+function stateToken(city){
+  const m = (city || "").trim().match(/([A-Z]{2})$/);
+  return m ? m[1] : null;
+}
+
 function renderStats(){
   const hospitals = H.filter(h=>h.name!=="Boys and Girls Club");
-  const states = new Set(hospitals.map(h=>h.city.split(", ")[1])); // includes DC as the 10th location
+  const states = new Set(hospitals.map(h=>stateToken(h.city)).filter(Boolean)); // includes DC as the 10th location
+  const shipped = hospitals.filter(h=>!!h.shipped).length;
   const parties = H.filter(h=>!!h.event).length;
   const stats = [
     {num:hospitals.length, label:"Hospitals reached"},
     {num:states.size, label:"States + DC"},
-    {num:hospitals.length, label:"Party boxes shipped"},
+    {num:shipped, label:"Party boxes shipped"},
     {num:parties, label:"Hosting parties", grow:true},
-    {num:"$14K+", label:"Raised for St. Jude", grow:true}
+    {num:"~$15K", label:"Raised for St. Jude", grow:true}
   ];
   document.getElementById("stats").innerHTML = stats.map(s=>
     `<div class="stat"><span class="num ${s.grow?'grow':''}">${s.num}</span><span class="label">${s.label}</span></div>`
